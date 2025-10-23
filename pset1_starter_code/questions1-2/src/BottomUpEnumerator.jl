@@ -4,6 +4,17 @@ function grow(plist::Vector{Shape})::Vector{Shape}
     res::Vector{Shape} = []
     # Question 1a
     # YOUR CODE HERE
+    for i in 1:length(plist)
+        push!(res, plist[i])
+        mirror_shape = Mirror(plist[i])
+        push!(res, mirror_shape)
+        for j in 1:length(plist)
+            union_shape = SUnion(plist[i], plist[j])
+            push!(res, union_shape)
+            intersection_shape = SIntersection(plist[i], plist[j])
+            push!(res, intersection_shape)
+        end
+    end
     return res
 end
 
