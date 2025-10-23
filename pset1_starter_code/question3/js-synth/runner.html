@@ -1,0 +1,17 @@
+<!--  HTML document includes the synlib.js file and has a button that 
+    runs a run() function in that file. -->
+
+<html>
+<head>
+    <title>Runner</title>
+    <script type="module">
+        import { testMerge } from './simplmaplang.js';
+        window.testMerge = testMerge;
+    </script>
+</head>
+<body>
+    <button onclick="testMerge()">Run</button>
+</body>
+
+
+</html>

@@ -1,0 +1,23 @@
+# Julia build artifacts
+*.ji
+*.dll
+*.dylib
+*.so
+*_cache/
+_artifacts/
+deps/build.log
+deps/usr/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Editors and IDEs
+.vscode/
+.idea/
+
+# Julia global folders
+.julia/
+
+# mac-os to other os artifacts
+**/._*

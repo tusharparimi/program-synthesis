@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synthesis Results Visualization</title>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@observablehq/plot@0.6"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            margin: 20px;
+            background-color: #fafafa;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .problem-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .problem-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .problem-title {
+            font-size: 1.4em;
+            color: #333;
+            margin: 0;
+        }
+        
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        
+        .status-correct {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-incorrect {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .problem-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .info-item {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .info-value {
+            color: #333;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 0.9em;
+        }
+        
+        .chart-container {
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #666;
+            padding: 20px;
+        }
+        
+        .error {
+            color: #d32f2f;
+            background: #ffebee;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        
+        .file-input {
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .file-input input[type="file"] {
+            margin: 10px;
+        }
+        
+        .legend {
+            margin: 15px 0;
+        }
+        
+        .legend-item {
+            display: inline-block;
+            margin-right: 20px;
+        }
+        
+        .legend-color {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            margin-right: 6px;
+            border-radius: 50%;
+        }
+        
+        /* Tooltip styles */
+        .plot-tooltip {
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            position: absolute;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Synthesis Results Visualization</h1>
+        
+        <div class="file-input" style="display: none;">
+            <label for="fileInput">Load synthesis results:</label>
+            <input type="file" id="fileInput" accept=".json" />
+            <button onclick="loadDefaultData()">Load Default Data</button>
+        </div>
+        
+        <div id="content">
+            <div class="loading">
+                Loading synthesis results...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let synthesisData = null;
+
+        // File input handler
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        synthesisData = JSON.parse(e.target.result);
+                        renderVisualization();
+                    } catch (error) {
+                        showError('Error parsing JSON file: ' + error.message);
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // Load default data (if synthesis_results.json exists)
+        async function loadDefaultData() {
+            try {
+                const response = await fetch('/synthesis_results.json');
+                if (response.ok) {
+                    synthesisData = await response.json();
+                    renderVisualization();
+                } else {
+                    showError('No synthesis results found. Please run the synthesis first by executing "node main.js" from the parent directory.');
+                }
+            } catch (error) {
+                showError('Error loading default data: ' + error.message);
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('content').innerHTML = `<div class="error">${message}</div>`;
+        }
+
+        function renderVisualization() {
+            if (!synthesisData) return;
+
+            const content = document.getElementById('content');
+            content.innerHTML = '';
+
+            synthesisData.forEach(problem => {
+                const section = document.createElement('div');
+                section.className = 'problem-section';
+                section.innerHTML = createProblemHTML(problem);
+                content.appendChild(section);
+
+                // Create the chart
+                createChart(problem, section.querySelector('.chart-container'));
+            });
+        }
+
+        function createProblemHTML(problem) {
+            const statusClass = problem.status === 'CORRECT' ? 'status-correct' : 'status-incorrect';
+            return `
+                <div class="problem-header">
+                    <h2 class="problem-title">${problem.problemName}</h2>
+                    <span class="status-badge ${statusClass}">${problem.status}</span>
+                </div>
+                
+                <div class="problem-info">
+                    <div class="info-item">
+                        <div class="info-label">Synthesized Expression:</div>
+                        <div class="info-value">${problem.synthesizedExpression}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Score:</div>
+                        <div class="info-value">${problem.score.toFixed(6)}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Cost:</div>
+                        <div class="info-value">${problem.cost}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Training Examples:</div>
+                        <div class="info-value">${problem.originalExamples.length} points</div>
+                    </div>
+                </div>
+
+                <div class="legend">
+                    <div class="legend-item">
+                        <span class="legend-color" style="background: #2563eb;"></span>
+                        Training Data
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background: #dc2626;"></span>
+                        Synthesized Predictions
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background: #fca5a5;"></span>
+                        Synthesized Function
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background: #60a5fa;"></span>
+                        Actual Function
+                    </div>
+                </div>
+                
+                <div class="chart-container"></div>
+            `;
+        }
+
+        function createChart(problem, container) {
+            // Prepare data for plotting
+            const trainingData = problem.originalExamples.map(ex => ({
+                x: ex.in.x,
+                y: ex.out,
+                type: 'Training Data'
+            }));
+
+            const predictionData = problem.synthesizedPredictions.map(pred => ({
+                x: pred.x,
+                y: pred.y,
+                type: 'Synthesized Predictions'
+            }));
+
+            const curveData = problem.continuousCurve.map(point => ({
+                x: point.x,
+                y: point.y,
+                type: 'Synthesized Function'
+            }));
+
+            const actualFunctionData = (problem.actualFunctionCurve || []).map(point => ({
+                x: point.x,
+                y: point.y,
+                type: 'Actual Function'
+            }));
+
+            // Find reasonable y-axis bounds based only on training data and predictions
+            // (ignore the continuous curve which might have extreme values)
+            const relevantYValues = [...trainingData, ...predictionData].map(d => d.y);
+            const yMin = Math.min(...relevantYValues);
+            const yMax = Math.max(...relevantYValues);
+            const yRange = yMax - yMin;
+            const yPadding = Math.max(yRange * 0.1, 1); // At least 1 unit padding
+
+            try {
+                // Create the plot
+                const plot = Plot.plot({
+                    title: `Function Synthesis: ${problem.problemName}`,
+                    width: 800,
+                    height: 400,
+                    grid: true,
+                    x: {
+                        label: "Input (x)",
+                        nice: true
+                    },
+                    y: {
+                        label: "Output (y)",
+                        domain: [yMin - yPadding, yMax + yPadding],
+                        nice: true
+                    },
+                    color: {
+                        domain: ["Training Data", "Synthesized Predictions", "Synthesized Function", "Actual Function"],
+                        range: ["#2563eb", "#dc2626", "#fca5a5", "#60a5fa"]
+                    },
+                    marks: [
+                        // Actual function curve (if available)
+                        ...(actualFunctionData.length > 0 ? [
+                            Plot.dot(actualFunctionData, {
+                                x: "x",
+                                y: "y",
+                                fill: "#60a5fa",
+                                fillOpacity: 0.8,
+                                r: 2
+                            })
+                        ] : []),
+                        
+                        // Synthesized function curve (if available)
+                        ...(curveData.length > 0 ? [
+                            Plot.dot(curveData, {
+                                x: "x",
+                                y: "y",
+                                fill: "#fca5a5",
+                                fillOpacity: 0.8,
+                                r: 2
+                            })
+                        ] : []),
+                        
+                        // Training data points
+                        Plot.dot(trainingData, {
+                            x: "x",
+                            y: "y",
+                            fill: "#2563eb",
+                            fillOpacity: 0.7,
+                            r: 6,
+                            title: d => `Training: (${d.x.toFixed(3)}, ${d.y.toFixed(3)})`
+                        }),
+                        
+                        // Synthesized predictions
+                        Plot.dot(predictionData, {
+                            x: "x",
+                            y: "y",
+                            fill: "#dc2626",
+                            fillOpacity: 0.7,
+                            r: 6,
+                            title: d => `Predicted: (${d.x.toFixed(3)}, ${d.y.toFixed(3)})`
+                        })
+                    ]
+                });
+
+                container.appendChild(plot);
+            } catch (error) {
+                console.error('Error creating chart for', problem.problemName, error);
+                container.innerHTML = `<div class="error">Error creating chart: ${error.message}</div>`;
+            }
+        }
+
+        // Try to load default data on page load
+        window.addEventListener('load', () => {
+            loadDefaultData();
+        });
+    </script>
+</body>
+</html>
