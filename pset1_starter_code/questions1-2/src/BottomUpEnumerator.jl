@@ -29,14 +29,38 @@ function synthesize(in_x::Vector{Float64}, in_y::Vector{Float64}, out::Vector{Bo
 
     # Question 1b
     # YOUR CODE HERE
-    return make_circle(make_coord(5, 5), 5)
+    # new_x and new_y help make the Mirror context become context independently equivalent
+    new_x = vcat(in_x, in_y)
+    new_y = vcat(in_y, in_x)
+    shapes = all_terminal_shapes()
+    while true
+        shapes = elim_equivalents(shapes, new_x, new_y)
+        shapes = grow(shapes)
+        for shape in shapes
+            if is_correct(shape, in_x, in_y, out)
+                return shape
+            end
+        end
+    end
 end
 
 
 function elim_equivalents(plist::Vector{Shape}, in_x::Vector{Float64}, in_y::Vector{Float64})::Vector{Shape}
     # Question 1b
     # YOUR CODE HERE
-    return []
+    N = length(in_x)
+    out_to_shape_map::Dict{NTuple{N, Bool}, Shape} = Dict{NTuple{N, Bool}, Shape}()
+    num_shapes = length(plist)
+    i = 1
+    while i <= num_shapes
+        # println(i)
+        out::NTuple{N, Bool} = tuple(interpret(plist[i], in_x, in_y)...)
+        if get(out_to_shape_map, out, 0) == 0
+            out_to_shape_map[out] = plist[i]
+        end
+        i = i + 1
+    end
+    return collect(values(out_to_shape_map))
 end
 
 function is_correct(p::Shape, in_x::Vector{Float64}, in_y::Vector{Float64}, out::Vector{Bool})::Bool
