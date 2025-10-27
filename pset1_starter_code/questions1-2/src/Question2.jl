@@ -54,4 +54,52 @@ function structured(inputoutputs::Vector{Tuple{Int64,String}})::LKDProgram
 
     # Question 2
     # YOUR CODE HERE
+    lens_of_out = length(inputoutputs[1][2])
+    terms = []
+    j = 64
+    while j >= 1
+        temp = []
+        for i in 2:5
+            temp = [temp..., fill(i, j)...]
+        end
+        append!(terms, repeat(temp, div(256, j*4)))
+        j = div(j, 4)
+    end
+    progs = reshape(terms, 256, 4)
+    valid_progs = [progs[i, :] for i in 1:size(progs, 1) if sum(progs[i, :]) == lens_of_out]
+
+    is_correct_prog = true
+    lkd_prog::LKDProgram = (LKDTerm(0, 0), LKDTerm(0, 0), LKDTerm(0, 0), LKDTerm(0, 0))
+
+    possible_lkd_progs = []
+    for prog in valid_progs
+        for i in 1:length(inputoutputs)
+            y = []
+            for p in 1:4
+                till = p - 1
+                idx = till == 0 ? 0 : sum(prog[1:till])
+                push!(y, positive_modulus(parse(Int, inputoutputs[i][2][idx+1:idx+prog[p]]) - inputoutputs[i][1], 10^prog[p]))
+            end
+            lkd_prog = tuple([LKDTerm(prog[j], y[j]) for j in 1:4]...)
+            if interpretLKDProgram(lkd_prog, inputoutputs[i][1]) == inputoutputs[i][2]
+                push!(possible_lkd_progs, lkd_prog)
+                break
+            end 
+        end
+    end
+
+    for lkd_prog in possible_lkd_progs
+        is_correct_prog = true
+        for (in, out) in inputoutputs
+            if interpretLKDProgram(lkd_prog, in) != out
+                is_correct_prog = false
+                break
+            end
+        end
+        if is_correct_prog
+            return lkd_prog
+        end
+    end
+    
+
 end
