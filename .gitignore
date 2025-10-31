@@ -21,3 +21,5 @@ Thumbs.db
 
 # mac-os to other os artifacts
 **/._*
+
+**/node_modules/
